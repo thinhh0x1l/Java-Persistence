@@ -5,8 +5,10 @@ import org.junit.jupiter.api.Test;
 import javax.persistence.EntityManager;
 import javax.persistence.EntityManagerFactory;
 import javax.persistence.Persistence;
+import javax.persistence.criteria.*;
 import javax.persistence.metamodel.*;
 import java.util.Date;
+import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -58,14 +60,57 @@ public class MetamodelTest {
         );
     }
 
+    @Test
+    public void accessStaticMetamodel() {
+        EntityManager em = emf.createEntityManager();
+        deleteItems(em);
+        persistenceItem(em);
+
+        CriteriaBuilder cb = em.getCriteriaBuilder();
+        CriteriaQuery<Item> query = cb.createQuery(Item.class);
+        Root<Item> fromItem = query.from(Item.class);
+        query.select(fromItem);
+        List<Item> items = em.createQuery(query).getResultList();
+
+        assertEquals(2,items.size());
+    }
+
+    @Test
+    public void testItemsPattern(){
+        EntityManager em = emf.createEntityManager();
+        deleteItems(em);
+        persistenceItem(em);
+
+        CriteriaBuilder cb = em.getCriteriaBuilder();
+        CriteriaQuery<Item> query = cb.createQuery(Item.class);
+        Root<Item> fromItem = query.from(Item.class);
+        Path<String> namePath = fromItem.get("name");
+        query.where(cb.like(namePath,cb.parameter(String.class, "pattern")));
+        List<Item> items = em.createQuery(query).setParameter("pattern","%Item 1%").getResultList();
+        assertAll(
+                () -> assertEquals(1,items.size()),
+                () -> assertEquals("Item 1",items.iterator().next().getName())
+        );
+    }
+
+
+    private void deleteItems(EntityManager em) {
+        em.getTransaction().begin();
+        CriteriaBuilder cb = em.getCriteriaBuilder();
+        CriteriaDelete<Item> query = cb.createCriteriaDelete(Item.class);
+        query.from(Item.class);
+        em.createQuery(query).executeUpdate();
+        em.getTransaction().commit();
+    }
+
     private void persistenceItem(EntityManager em) {
         em.getTransaction().begin();
         Item item1 = new Item();
-        item1.setName("item1");
+        item1.setName("Item 1");
         item1.setAuctionEnd(tomorrow());
 
         Item item2 = new Item();
-        item2.setName("item2");
+        item2.setName("Item 2");
         item2.setAuctionEnd(tomorrow());
 
         em.persist(item1);
